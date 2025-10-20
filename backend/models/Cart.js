@@ -31,9 +31,16 @@ class Cart {
 
   static async getByUserId(userId) {
     const [rows] = await pool.execute(`
-      SELECT c.*, p.name, p.description, p.price, p.image_url, p.stock_quantity 
+      SELECT 
+        c.*, 
+        p.name, 
+        p.description, 
+        p.price, 
+        COALESCE(p.image_url, pi.image_url) as image_url, 
+        p.stock_quantity 
       FROM cart c 
       JOIN products p ON c.product_id = p.id 
+      LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = 1
       WHERE c.user_id = ? AND p.is_active = TRUE 
       ORDER BY c.created_at DESC
     `, [userId]);
@@ -72,6 +79,7 @@ class Cart {
         SUM(c.quantity * p.price) as total_price
       FROM cart c 
       JOIN products p ON c.product_id = p.id 
+      LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = 1
       WHERE c.user_id = ? AND p.is_active = TRUE
     `, [userId]);
     return rows[0];
@@ -80,9 +88,15 @@ class Cart {
   static async validateCartItems(userId) {
     // Check if all cart items are still available and in stock
     const [rows] = await pool.execute(`
-      SELECT c.*, p.name, p.stock_quantity, p.is_active 
+      SELECT 
+        c.*, 
+        p.name, 
+        p.stock_quantity, 
+        p.is_active,
+        COALESCE(p.image_url, pi.image_url) as image_url
       FROM cart c 
       JOIN products p ON c.product_id = p.id 
+      LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = 1
       WHERE c.user_id = ?
     `, [userId]);
     
