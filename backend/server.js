@@ -51,8 +51,9 @@ app.use(helmet({
 
 // CORS configuration - Updated for Render deployment
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://padidekhoy.ir',
-  'http://padidekhoy.ir',
+  process.env.FRONTEND_URL || 'https://padidekhoy.ir',
+  'https://padidekhoy.ir',
+  'https://www.padidekhoy.ir',
   'http://localhost:5174', // Add localhost for development
   'http://localhost:5173', // Add alternative localhost port
   'http://127.0.0.1:5174', // Add 127.0.0.1 for development
