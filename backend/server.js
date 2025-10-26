@@ -4,19 +4,19 @@ const dotenv = require('dotenv');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const { testConnection, initializeDatabase, insertSampleData, pool } = require('./config/database');
-
-console.log('=== SERVER.JS STARTING ===');
+const { pool, testConnection, initializeDatabase, insertSampleData } = require('./config/database');
 
 // Load environment variables
 dotenv.config({ path: __dirname + '/.env' });
 console.log('Environment variables loaded:');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('PORT:', process.env.PORT);
-console.log('DB_HOST:', process.env.DB_HOST);
 console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not loaded');
+console.log('DB_HOST:', process.env.DB_HOST);
+console.log('PORT:', process.env.PORT);
 
 const app = express();
+
+// Trust proxy - IMPORTANT for rate limiting to work correctly with nginx
+app.set('trust proxy', 1);
 
 // Add a very early middleware to log all requests
 app.use((req, res, next) => {

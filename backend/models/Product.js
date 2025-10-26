@@ -333,11 +333,25 @@ class Product {
   }
   
   static async incrementSalesCount(productId, quantity = 1) {
-    const [result] = await pool.execute(
-      'UPDATE products SET sales_count = sales_count + ? WHERE id = ?',
-      [quantity, productId]
-    );
-    return result.affectedRows > 0;
+    try {
+      console.log('=== PRODUCT MODEL: incrementSalesCount ===');
+      console.log('Product ID:', productId, 'Quantity:', quantity);
+      
+      const [result] = await pool.execute(
+        'UPDATE products SET sales_count = sales_count + ? WHERE id = ?',
+        [quantity, productId]
+      );
+      
+      console.log('Sales count update result:', result.affectedRows);
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error('=== PRODUCT MODEL: incrementSalesCount ERROR ===');
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error stack:', error.stack);
+      throw error;
+    }
   }
 }
 

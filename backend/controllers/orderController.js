@@ -59,7 +59,8 @@ const createOrder = async (req, res) => {
         console.log('ERROR: Cart validation failed:', validation.issues);
         return res.status(400).json({
           message: 'Cart validation failed',
-          issues: validation.issues
+          issues: validation.issues,
+          details: 'Please review the items in your cart. Some products may be out of stock or no longer available.'
         });
       }
 
@@ -123,12 +124,24 @@ const createOrder = async (req, res) => {
         continue;
       }
       
+      // More specific error handling
       if (error.message.includes('stock')) {
         return res.status(400).json({ message: 'Some items are out of stock' });
+      } else if (error.message.includes('database') || error.message.includes('connection')) {
+        return res.status(500).json({ 
+          message: 'Database connection error. Please try again later.',
+          error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        });
+      } else if (error.message.includes('validation')) {
+        return res.status(400).json({ 
+          message: 'Order validation failed',
+          error: process.env.NODE_ENV === 'development' ? error.message : 'Validation error'
+        });
       } else {
         return res.status(500).json({ 
           message: 'Failed to place order',
-          error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+          error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+          details: 'An unexpected error occurred while processing your order. Please try again.'
         });
       }
     }

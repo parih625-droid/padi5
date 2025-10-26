@@ -39,4 +39,22 @@ router.delete('/clear', auth.authenticateToken, cartController.clearCart);
 router.delete('/:product_id', auth.authenticateToken, paramProductIdValidation, cartController.removeFromCart);
 router.get('/validate', auth.authenticateToken, cartController.validateCart);
 
+// Debug endpoint - only for development
+if (process.env.NODE_ENV === 'development') {
+  router.get('/debug', auth.authenticateToken, auth.authorizeAdmin, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const validation = await Cart.validateCartItems(userId);
+      res.json({
+        userId,
+        validation,
+        message: 'Cart debug information'
+      });
+    } catch (error) {
+      console.error('Cart debug error:', error);
+      res.status(500).json({ message: 'Failed to debug cart' });
+    }
+  });
+}
+
 module.exports = router;

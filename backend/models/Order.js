@@ -2,35 +2,54 @@ const { pool } = require('../config/database');
 
 class Order {
   static async create(orderData) {
+    console.log('=== ORDER MODEL: CREATE START ===');
     const connection = await pool.getConnection();
     
     try {
+      console.log('=== ORDER MODEL: GOT CONNECTION ===');
       await connection.beginTransaction();
+      console.log('=== ORDER MODEL: TRANSACTION STARTED ===');
       
       const { user_id, customer_name, customer_phone, customer_address, notes, items } = orderData;
       
-      // Calculate total price
-      let total_price = 0;
-      for (const item of items) {
-        total_price += item.price * item.quantity;
-      }
+      console.log('=== ORDER MODEL: CREATE ===');
+      console.log('Order data:', orderData);
       
-      // Create order
+      // Calculate total amount
+      let total_amount = 0;
+      for (const item of items) {
+        total_amount += item.price * item.quantity;
+      }
+      console.log('Calculated total amount:', total_amount);
+      
+      // Combine customer info into shipping_address field
+      const shipping_address = JSON.stringify({
+        customer_name,
+        customer_phone,
+        customer_address,
+        notes: notes || null
+      });
+      
+      // Create order - using the correct database schema
+      console.log('Executing order insert query...');
       const [orderResult] = await connection.execute(
-        'INSERT INTO orders (user_id, total_price, customer_name, customer_phone, customer_address, notes) VALUES (?, ?, ?, ?, ?, ?)',
-        [user_id, total_price, customer_name, customer_phone, customer_address, notes]
+        'INSERT INTO orders (user_id, total_amount, shipping_address, payment_method, status) VALUES (?, ?, ?, ?, ?)',
+        [user_id, total_amount, shipping_address, 'pending', 'pending']
       );
       
       const orderId = orderResult.insertId;
+      console.log('Order created with ID:', orderId);
       
       // Create order items and update product stock
       for (const item of items) {
+        console.log('Creating order item:', item);
         await connection.execute(
           'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
           [orderId, item.product_id, item.quantity, item.price]
         );
         
         // Update product stock
+        console.log('Updating product stock for product:', item.product_id, 'quantity:', item.quantity);
         await connection.execute(
           'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?',
           [item.quantity, item.product_id]
@@ -38,12 +57,19 @@ class Order {
       }
       
       await connection.commit();
+      console.log('Order creation completed successfully');
       return orderId;
     } catch (error) {
+      console.error('=== ORDER MODEL: CREATE ERROR ===');
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error stack:', error.stack);
       await connection.rollback();
       throw error;
     } finally {
       connection.release();
+      console.log('=== ORDER MODEL: CONNECTION RELEASED ===');
     }
   }
 
@@ -63,7 +89,21 @@ class Order {
     console.log('Query duration:', endTime - startTime, 'ms');
     console.log('Rows found:', rows.length);
     
-    return rows[0];
+    if (rows.length > 0) {
+      // Parse shipping_address JSON back to individual fields
+      try {
+        const shippingInfo = JSON.parse(rows[0].shipping_address);
+        rows[0].customer_name = shippingInfo.customer_name;
+        rows[0].customer_phone = shippingInfo.customer_phone;
+        rows[0].customer_address = shippingInfo.customer_address;
+        rows[0].notes = shippingInfo.notes;
+      } catch (e) {
+        console.error('Error parsing shipping address:', e);
+      }
+      return rows[0];
+    }
+    
+    return null;
   }
 
   static async getOrderItems(orderId) {
@@ -92,6 +132,20 @@ class Order {
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
     `, [userId, limit, offset]);
+    
+    // Parse shipping_address for all orders
+    rows.forEach(order => {
+      try {
+        const shippingInfo = JSON.parse(order.shipping_address);
+        order.customer_name = shippingInfo.customer_name;
+        order.customer_phone = shippingInfo.customer_phone;
+        order.customer_address = shippingInfo.customer_address;
+        order.notes = shippingInfo.notes;
+      } catch (e) {
+        console.error('Error parsing shipping address:', e);
+      }
+    });
+    
     return rows;
   }
 
@@ -114,6 +168,20 @@ class Order {
       const [rows] = await pool.execute(query);
       console.log('Query executed successfully, rows found:', rows.length);
       console.log('Sample rows:', rows.slice(0, 2)); // Log first 2 rows for debugging
+      
+      // Parse shipping_address for all orders
+      rows.forEach(order => {
+        try {
+          const shippingInfo = JSON.parse(order.shipping_address);
+          order.customer_name = shippingInfo.customer_name;
+          order.customer_phone = shippingInfo.customer_phone;
+          order.customer_address = shippingInfo.customer_address;
+          order.notes = shippingInfo.notes;
+        } catch (e) {
+          console.error('Error parsing shipping address:', e);
+        }
+      });
+      
       return rows;
     } catch (error) {
       console.error('=== ORDER MODEL GETALL ERROR ===');
@@ -152,7 +220,7 @@ class Order {
 
   static async getDashboardStats() {
     const [totalOrders] = await pool.execute('SELECT COUNT(*) as count FROM orders');
-    const [totalRevenue] = await pool.execute('SELECT SUM(total_price) as total FROM orders WHERE status != "cancelled"');
+    const [totalRevenue] = await pool.execute('SELECT SUM(total_amount) as total FROM orders WHERE status != "cancelled"');
     const [pendingOrders] = await pool.execute('SELECT COUNT(*) as count FROM orders WHERE status = "pending"');
     const [recentOrders] = await pool.execute(`
       SELECT o.*, u.name as user_name 
@@ -161,6 +229,19 @@ class Order {
       ORDER BY o.created_at DESC 
       LIMIT 5
     `);
+
+    // Parse shipping_address for recent orders
+    recentOrders.forEach(order => {
+      try {
+        const shippingInfo = JSON.parse(order.shipping_address);
+        order.customer_name = shippingInfo.customer_name;
+        order.customer_phone = shippingInfo.customer_phone;
+        order.customer_address = shippingInfo.customer_address;
+        order.notes = shippingInfo.notes;
+      } catch (e) {
+        console.error('Error parsing shipping address:', e);
+      }
+    });
 
     return {
       totalOrders: totalOrders[0].count,
