@@ -3,6 +3,8 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const PaymentService = require('../services/paymentService');
+const notificationService = require('../services/notificationService');
+const User = require('../models/User');
 
 const createOrder = async (req, res) => {
   // Add retry logic for rate limiting
@@ -100,6 +102,26 @@ const createOrder = async (req, res) => {
       console.log('Fetching complete order details...');
       const order = await Order.getOrderWithItems(orderId);
       console.log('Complete order:', order);
+
+      // Get user details for notifications
+      console.log('Fetching user details for notifications...');
+      const user = await User.findById(userId);
+      console.log('User details:', user);
+
+      // Send notifications
+      console.log('Sending notifications...');
+      try {
+        // Send notification to admin
+        await notificationService.sendOrderPlacedNotification(order, user);
+        
+        // Send confirmation to customer
+        await notificationService.sendOrderConfirmationToCustomer(order, user);
+        
+        console.log('✅ Notifications sent successfully');
+      } catch (notificationError) {
+        console.error('❌ Failed to send notifications:', notificationError);
+        // Don't fail the order creation if notifications fail
+      }
 
       console.log('=== ORDER CREATION SUCCESS ===');
       return res.status(201).json({
@@ -375,7 +397,7 @@ const verifyPayment = async (req, res) => {
 
     // Get order details
     console.log('Fetching order details for ID:', orderId);
-    const order = await Order.findById(orderId);
+    const order = await Order.getOrderWithItems(orderId);
     if (!order) {
       console.log('Order not found for ID:', orderId);
       return res.status(404).json({ message: 'Order not found' });
@@ -404,6 +426,16 @@ const verifyPayment = async (req, res) => {
         payment_verified_at: new Date(),
         status: 'confirmed'
       });
+
+      // Send payment completion notification to admin
+      console.log('Sending payment completion notification...');
+      try {
+        await notificationService.sendPaymentCompletedNotification(order, req.user);
+        console.log('✅ Payment completion notification sent successfully');
+      } catch (notificationError) {
+        console.error('❌ Failed to send payment completion notification:', notificationError);
+        // Don't fail the payment verification if notifications fail
+      }
 
       res.json({
         success: true,
