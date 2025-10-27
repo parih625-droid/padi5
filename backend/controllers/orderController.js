@@ -344,7 +344,7 @@ const initializePayment = async (req, res) => {
     // Initialize payment
     const paymentResult = await PaymentService.initializePayment(
       gateway,
-      order.total_price,
+      order.total_amount,
       order.id,
       userInfo,
       callbackUrl
@@ -411,7 +411,7 @@ const verifyPayment = async (req, res) => {
       order.payment_gateway,
       {
         authority: authority,
-        amount: order.total_price
+        amount: order.total_amount
       }
     );
     

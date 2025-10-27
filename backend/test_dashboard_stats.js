@@ -8,7 +8,7 @@ async function testDashboardStats() {
     const [totalOrders] = await pool.execute('SELECT COUNT(*) as count FROM orders');
     console.log('Total orders:', totalOrders[0].count);
     
-    const [totalRevenue] = await pool.execute('SELECT SUM(total_price) as total FROM orders WHERE status != "cancelled"');
+    const [totalRevenue] = await pool.execute('SELECT SUM(total_amount) as total FROM orders WHERE status != "cancelled"');
     console.log('Total revenue:', totalRevenue[0].total || 0);
     
     const [pendingOrders] = await pool.execute('SELECT COUNT(*) as count FROM orders WHERE status = "pending"');
